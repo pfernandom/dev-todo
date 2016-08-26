@@ -1,0 +1,10 @@
+{
+  "name": "dev-todo",
+  "app_id": "",
+  "proxies": [
+    {
+      "path": "/todos",
+      "proxyUrl": "http://docker:32770/todos"
+    }
+  ]
+}

@@ -12,7 +12,7 @@ angular.module('devTodo').controller('TodoCtrl',['$scope','$ionicModal','$ionicP
         TodoManager.initDB();
 
         // Get all birthday records from the database.
-        TodoManager.getAllBirthdays().then(function(todos) {
+        TodoManager.getAllTodos().then(function(todos) {
             $scope.tasks = todos;
         });
     });
@@ -40,13 +40,12 @@ angular.module('devTodo').controller('TodoCtrl',['$scope','$ionicModal','$ionicP
 	$scope.createTask = function () {
 		//creates a new task
 		TodoManager.saveTodo($scope.task);
-		$scope.tasks.push($scope.task );
 		$scope.task = {};
 		//close new task modal
 		$scope.newTaskModal.hide();
 	}
 	$scope.removeTask = function (index) {
-		TodoManager.deleteTodo($scope.task);
+		TodoManager.deleteTodo($scope.tasks[index]);
 		$scope.tasks.splice(index, 1);
 	}
 	$scope.completeTask = function (index) {

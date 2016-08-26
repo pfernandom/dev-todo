@@ -6,7 +6,7 @@
 (function(){
 var app = angular.module('devTodo');
 
-app.service('TodoManager',['$q',function($q){
+app.service('TodoManager',['$q','ApiEndpoint',function($q, ApiEndpoint){
 	var _db;
 	var _todos;
 	
@@ -42,7 +42,36 @@ app.service('TodoManager',['$q',function($q){
 			// Creates the database or opens if it already exists
 			console.log('Init db');
 			//_db = new PouchDB('devtodo', {adapter: 'websql'});
-			_db = new PouchDB('devtodo');
+			_db = new PouchDB('todos');
+			var remoteDB = new PouchDB(ApiEndpoint);
+			_db.sync(remoteDB, {live: true});
+			
+			
+			 _db.changes({
+				continuous: true,
+				onChange: function(change) {
+					console.log(change)/*
+					if (!change.deleted) {
+						$rootScope.$apply(function() {
+							localDB.get(change.id, function(err, doc) {
+								$rootScope.$apply(function() {
+									if (err) console.log(err);
+									$rootScope.$broadcast('add', doc);
+								})
+							});
+						})
+					} else {
+						$rootScope.$apply(function() {
+							$rootScope.$broadcast('delete', change.id);
+						});
+					}*/
+				}
+			});
+			
+			
+			
+			
+			
 		},
 		saveTodo:function(todo){
 			return $q.when(_db.post(todo));

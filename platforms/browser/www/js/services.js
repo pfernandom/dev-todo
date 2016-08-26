@@ -9,10 +9,69 @@ var app = angular.module('devTodo');
 app.service('TodoManager',['$q',function($q){
 	var _db;
 	var _todos;
+	
+	function onDatabaseChange(change) {  
+		var index = findIndex(_todos, change.id);
+		var birthday = _todos[index];
+
+		if (change.deleted) {
+			if (birthday) {
+				_todos.splice(index, 1); // delete
+			}
+		} else {
+			if (birthday && birthday._id === change.id) {
+				_todos[index] = change.doc; // update
+			} else {
+				_todos.splice(index, 0, change.doc) // insert
+			}
+		}
+	}
+
+	// Binary search, the array is by default sorted by _id.
+	function findIndex(array, id) {  
+		var low = 0, high = array.length, mid;
+		while (low < high) {
+		mid = (low + high) >>> 1;
+		array[mid]._id < id ? low = mid + 1 : high = mid
+		}
+		return low;
+	}
+	
 	return {
-		initDB(): function(){
+		initDB: function(){
 			// Creates the database or opens if it already exists
-			_db = new PouchDB('devtodo', {adapter: 'websql'});
+			console.log('Init db');
+			//_db = new PouchDB('devtodo', {adapter: 'websql'});
+			_db = new PouchDB('devtodo');
+			var remoteDB = new PouchDB("http://docker:32770/todos");
+			_db.sync(remoteDB, {live: true});
+			
+			
+			 _db.changes({
+				continuous: true,
+				onChange: function(change) {
+					console.log(change)/*
+					if (!change.deleted) {
+						$rootScope.$apply(function() {
+							localDB.get(change.id, function(err, doc) {
+								$rootScope.$apply(function() {
+									if (err) console.log(err);
+									$rootScope.$broadcast('add', doc);
+								})
+							});
+						})
+					} else {
+						$rootScope.$apply(function() {
+							$rootScope.$broadcast('delete', change.id);
+						});
+					}*/
+				}
+			});
+			
+			
+			
+			
+			
 		},
 		saveTodo:function(todo){
 			return $q.when(_db.post(todo));
@@ -53,31 +112,5 @@ app.service('TodoManager',['$q',function($q){
 	
 }]);
 
-function onDatabaseChange(change) {  
-    var index = findIndex(_todos, change.id);
-    var birthday = _todos[index];
-
-    if (change.deleted) {
-        if (birthday) {
-            _todos.splice(index, 1); // delete
-        }
-    } else {
-        if (birthday && birthday._id === change.id) {
-            _todos[index] = change.doc; // update
-        } else {
-            _todos.splice(index, 0, change.doc) // insert
-        }
-    }
-}
-
-// Binary search, the array is by default sorted by _id.
-function findIndex(array, id) {  
-    var low = 0, high = array.length, mid;
-    while (low < high) {
-    mid = (low + high) >>> 1;
-    array[mid]._id < id ? low = mid + 1 : high = mid
-    }
-    return low;
-}
 
 })();
