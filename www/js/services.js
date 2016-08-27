@@ -6,11 +6,11 @@
 (function(){
 var app = angular.module('devTodo');
 
-app.service('TodoManager',['$q','ApiEndpoint',function($q, ApiEndpoint){
+app.service('TodoManager',['$q','ApiEndpoint','$rootScope',function($q, ApiEndpoint, $rootScope){
 	var _db;
 	var _todos;
-	
-	function onDatabaseChange(change) {  
+
+	function onDatabaseChange(change) {
 		var index = findIndex(_todos, change.id);
 		var birthday = _todos[index];
 
@@ -28,7 +28,7 @@ app.service('TodoManager',['$q','ApiEndpoint',function($q, ApiEndpoint){
 	}
 
 	// Binary search, the array is by default sorted by _id.
-	function findIndex(array, id) {  
+	function findIndex(array, id) {
 		var low = 0, high = array.length, mid;
 		while (low < high) {
 		mid = (low + high) >>> 1;
@@ -36,42 +36,33 @@ app.service('TodoManager',['$q','ApiEndpoint',function($q, ApiEndpoint){
 		}
 		return low;
 	}
-	
+
 	return {
 		initDB: function(){
 			// Creates the database or opens if it already exists
 			console.log('Init db');
 			//_db = new PouchDB('devtodo', {adapter: 'websql'});
 			_db = new PouchDB('todos');
-			var remoteDB = new PouchDB(ApiEndpoint);
+			var remoteDB = new PouchDB(ApiEndpoint.url);
 			_db.sync(remoteDB, {live: true});
-			
-			
-			 _db.changes({
-				continuous: true,
-				onChange: function(change) {
-					console.log(change)/*
-					if (!change.deleted) {
-						$rootScope.$apply(function() {
-							localDB.get(change.id, function(err, doc) {
-								$rootScope.$apply(function() {
-									if (err) console.log(err);
-									$rootScope.$broadcast('add', doc);
-								})
-							});
-						})
-					} else {
-						$rootScope.$apply(function() {
-							$rootScope.$broadcast('delete', change.id);
-						});
-					}*/
-				}
-			});
-			
-			
-			
-			
-			
+
+      _db.changes({live: true, since: 'now'}).on('change', function (change) {
+        if (!change.deleted) {
+          $rootScope.$apply(function() {
+            _db.get(change.id, function(err, doc) {
+              $rootScope.$apply(function() {
+                if (err) console.log(err);
+                $rootScope.$broadcast('add', doc);
+              })
+            });
+          })
+        } else {
+          $rootScope.$apply(function() {
+            $rootScope.$broadcast('delete', change.id);
+          });
+        }
+      }).on('error', console.log.bind(console));
+
 		},
 		saveTodo:function(todo){
 			return $q.when(_db.post(todo));
@@ -87,7 +78,7 @@ app.service('TodoManager',['$q','ApiEndpoint',function($q, ApiEndpoint){
 			   return $q.when(_db.allDocs({ include_docs: true}))
 					.then(function(docs) {
 
-						// Each row has a .doc object and we just want to send an 
+						// Each row has a .doc object and we just want to send an
 						// array of birthday objects back to the calling controller,
 						// so let's map the array to contain just the .doc objects.
 						_todos = docs.rows.map(function(row) {
@@ -107,9 +98,9 @@ app.service('TodoManager',['$q','ApiEndpoint',function($q, ApiEndpoint){
 				return $q.when(_todos);
 			}
 		}
-	
+
 	}
-	
+
 }]);
 
 

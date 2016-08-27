@@ -4,7 +4,7 @@
   "proxies": [
     {
       "path": "/todos",
-      "proxyUrl": "http://docker:32770/todos"
+      "proxyUrl": "http://localhost:32770/todos"
     }
   ]
 }

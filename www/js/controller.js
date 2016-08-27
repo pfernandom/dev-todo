@@ -51,18 +51,40 @@ angular.module('devTodo').controller('TodoCtrl',['$scope','$ionicModal','$ionicP
 	$scope.completeTask = function (index) {
 		//updates a task as completed
 		if (index !== -1) {
-		  $scope.tasks[index].completed = !!$scope.tasks[index].completed ; 
-		} 
+		  $scope.tasks[index].completed = !!$scope.tasks[index].completed ;
+		}
 	}
-	
+
 	$scope.openTaskModal = function(){
 		$scope.newTaskModal.show();
 	}
-	
+
 	$scope.closeTaskModal = function(){
 		$scope.newTaskModal.hide();
 	}
-	
+
+  $scope.$on('add', function(event, todo) {
+    var results = [];
+    angular.forEach($scope.tasks, function(value, key) {
+      if(todo._id === value._id){
+        this.push(value);
+      }
+    }, results);
+
+    if(results.length === 0){
+      $scope.tasks.push(todo);
+    }
+
+  });
+
+  $scope.$on('delete', function(event, id) {
+    for(var i = 0; i < $scope.tasks.length; i++) {
+      if($scope.tasks[i]._id === id) {
+        $scope.tasks.splice(i, 1);
+      }
+    }
+  });
+
 }]);
 
 
