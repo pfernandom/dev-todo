@@ -22,3 +22,8 @@ angular.module('devTodo', ['ionic'])
     }
   });
 })
+
+
+.constant('ApiEndpoint', {
+  url: 'http://localhost:8100/todos'
+})

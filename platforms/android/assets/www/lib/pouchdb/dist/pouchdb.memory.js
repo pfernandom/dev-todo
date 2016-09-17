@@ -1,4 +1,4 @@
-// PouchDB in-memory plugin 5.4.1
+// PouchDB in-memory plugin 5.4.5
 // Based on MemDOWN: https://github.com/rvagg/memdown
 // 
 // (c) 2012-2016 Dale Harvey and the PouchDB team
@@ -1975,8 +1975,12 @@ EventEmitter.prototype.emit = function(type) {
       er = arguments[1];
       if (er instanceof Error) {
         throw er; // Unhandled 'error' event
+      } else {
+        // At least give some kind of context to the user
+        var err = new Error('Uncaught, unspecified "error" event. (' + er + ')');
+        err.context = er;
+        throw err;
       }
-      throw TypeError('Uncaught, unspecified "error" event.');
     }
   }
 
@@ -2396,6 +2400,31 @@ function nextTick(fn, arg1, arg2, arg3) {
 // shim for using process in browser
 
 var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+(function () {
+  try {
+    cachedSetTimeout = setTimeout;
+  } catch (e) {
+    cachedSetTimeout = function () {
+      throw new Error('setTimeout is not defined');
+    }
+  }
+  try {
+    cachedClearTimeout = clearTimeout;
+  } catch (e) {
+    cachedClearTimeout = function () {
+      throw new Error('clearTimeout is not defined');
+    }
+  }
+} ())
 var queue = [];
 var draining = false;
 var currentQueue;
@@ -2420,7 +2449,7 @@ function drainQueue() {
     if (draining) {
         return;
     }
-    var timeout = setTimeout(cleanUpNextTick);
+    var timeout = cachedSetTimeout(cleanUpNextTick);
     draining = true;
 
     var len = queue.length;
@@ -2437,7 +2466,7 @@ function drainQueue() {
     }
     currentQueue = null;
     draining = false;
-    clearTimeout(timeout);
+    cachedClearTimeout(timeout);
 }
 
 process.nextTick = function (fun) {
@@ -2449,7 +2478,7 @@ process.nextTick = function (fun) {
     }
     queue.push(new Item(fun, args));
     if (queue.length === 1 && !draining) {
-        setTimeout(drainQueue, 0);
+        cachedSetTimeout(drainQueue, 0);
     }
 };
 
@@ -5577,7 +5606,7 @@ var REV_CONFLICT = new PouchError({
 
 var INVALID_ID = new PouchError({
   status: 400,
-  error: 'invalid_id',
+  error: 'bad_request',
   reason: '_id field must contain a string'
 });
 
@@ -5694,34 +5723,7 @@ var INVALID_URL = new PouchError({
   reason: 'Provided URL is invalid'
 });
 
-var allErrors = [
-  UNAUTHORIZED,
-  MISSING_BULK_DOCS,
-  MISSING_DOC,
-  REV_CONFLICT,
-  INVALID_ID,
-  MISSING_ID,
-  RESERVED_ID,
-  NOT_OPEN,
-  UNKNOWN_ERROR,
-  BAD_ARG,
-  INVALID_REQUEST,
-  QUERY_PARSE_ERROR,
-  DOC_VALIDATION,
-  BAD_REQUEST,
-  NOT_AN_OBJECT,
-  DB_MISSING,
-  WSQ_ERROR,
-  LDB_ERROR,
-  FORBIDDEN,
-  INVALID_REV,
-  FILE_EXISTS,
-  MISSING_STUB,
-  IDB_ERROR,
-  INVALID_URL
-];
-
-function createError(error, reason, name) {
+function createError(error, reason) {
   function CustomPouchError(reason) {
     // inherit error properties from our parent error manually
     // so as to allow proper JSON parsing.
@@ -5732,9 +5734,6 @@ function createError(error, reason, name) {
       }
     }
     /* jshint ignore:end */
-    if (name !== undefined) {
-      this.name = name;
-    }
     if (reason !== undefined) {
       this.reason = reason;
     }
@@ -6450,19 +6449,6 @@ function isLocalId(id) {
   return (/^_local/).test(id);
 }
 
-//Can't find original post, but this is close
-//http://stackoverflow.com/questions/6965107/ (continues on next line)
-//converting-between-strings-and-arraybuffers
-function arrayBufferToBinaryString(buffer) {
-  var binary = '';
-  var bytes = new Uint8Array(buffer);
-  var length = bytes.byteLength;
-  for (var i = 0; i < length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return binary;
-}
-
 var atob$1 = function (str) {
   return atob(str);
 };
@@ -6512,6 +6498,19 @@ function binStringToBluffer(binString, type) {
   return createBlob([binaryStringToArrayBuffer(binString)], {type: type});
 }
 
+//Can't find original post, but this is close
+//http://stackoverflow.com/questions/6965107/ (continues on next line)
+//converting-between-strings-and-arraybuffers
+function arrayBufferToBinaryString(buffer) {
+  var binary = '';
+  var bytes = new Uint8Array(buffer);
+  var length = bytes.byteLength;
+  for (var i = 0; i < length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return binary;
+}
+
 // shim for browsers that don't support it
 function readAsBinaryString(blob, callback) {
   if (typeof FileReader === 'undefined') {
@@ -6537,6 +6536,22 @@ function readAsBinaryString(blob, callback) {
   }
 }
 
+// simplified API. universal browser support is assumed
+function readAsArrayBuffer(blob, callback) {
+  if (typeof FileReader === 'undefined') {
+    // fix for Firefox in a web worker:
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=901097
+    return callback(new FileReaderSync().readAsArrayBuffer(blob));
+  }
+
+  var reader = new FileReader();
+  reader.onloadend = function (e) {
+    var result = e.target.result || new ArrayBuffer(0);
+    callback(result);
+  };
+  reader.readAsArrayBuffer(blob);
+}
+
 var setImmediateShim = global.setImmediate || global.setTimeout;
 var MD5_CHUNK_SIZE = 32768;
 
@@ -6544,46 +6559,62 @@ function rawToBase64(raw) {
   return btoa$1(raw);
 }
 
-function appendBuffer(buffer, data, start, end) {
-  if (start > 0 || end < data.byteLength) {
-    // only create a subarray if we really need to
-    data = new Uint8Array(data, start,
-      Math.min(end, data.byteLength) - start);
+function sliceBlob(blob, start, end) {
+  if (blob.webkitSlice) {
+    return blob.webkitSlice(start, end);
   }
-  buffer.append(data);
+  return blob.slice(start, end);
 }
 
-function appendString(buffer, data, start, end) {
-  if (start > 0 || end < data.length) {
-    // only create a substring if we really need to
-    data = data.substring(start, end);
+function appendBlob(buffer, blob, start, end, callback) {
+  if (start > 0 || end < blob.size) {
+    // only slice blob if we really need to
+    blob = sliceBlob(blob, start, end);
   }
-  buffer.appendBinary(data);
+  readAsArrayBuffer(blob, function (arrayBuffer) {
+    buffer.append(arrayBuffer);
+    callback();
+  });
+}
+
+function appendString(buffer, string, start, end, callback) {
+  if (start > 0 || end < string.length) {
+    // only create a substring if we really need to
+    string = string.substring(start, end);
+  }
+  buffer.appendBinary(string);
+  callback();
 }
 
 function binaryMd5(data, callback) {
   var inputIsString = typeof data === 'string';
-  var len = inputIsString ? data.length : data.byteLength;
+  var len = inputIsString ? data.length : data.size;
   var chunkSize = Math.min(MD5_CHUNK_SIZE, len);
   var chunks = Math.ceil(len / chunkSize);
   var currentChunk = 0;
   var buffer = inputIsString ? new Md5() : new Md5.ArrayBuffer();
 
-  var append = inputIsString ? appendString : appendBuffer;
+  var append = inputIsString ? appendString : appendBlob;
+
+  function next() {
+    setImmediateShim(loadNextChunk);
+  }
+
+  function done() {
+    var raw = buffer.end(true);
+    var base64 = rawToBase64(raw);
+    callback(base64);
+    buffer.destroy();
+  }
 
   function loadNextChunk() {
     var start = currentChunk * chunkSize;
     var end = start + chunkSize;
     currentChunk++;
     if (currentChunk < chunks) {
-      append(buffer, data, start, end);
-      setImmediateShim(loadNextChunk);
+      append(buffer, data, start, end, next);
     } else {
-      append(buffer, data, start, end);
-      var raw = buffer.end(true);
-      var base64 = rawToBase64(raw);
-      callback(base64);
-      buffer.destroy();
+      append(buffer, data, start, end, done);
     }
   }
   loadNextChunk();
@@ -7008,11 +7039,11 @@ function LevelPouch(opts, callback) {
       db = dbStore.get(name);
       db._docCount  = -1;
       db._queue = new Deque();
-      /* istanbul ignore if */
-      if (opts.noMigrate || (opts.db && !opts.migrate)) {
-        afterDBCreated();
-      } else {
+      /* istanbul ignore else */
+      if (opts.migrate) { // migration for leveldown
         migrate.toSublevel(name, db, afterDBCreated);
+      } else {
+        afterDBCreated();
       }
     })));
   }
@@ -7388,6 +7419,7 @@ function LevelPouch(opts, callback) {
 
     function finish() {
       compact(stemmedRevs, function (error) {
+        /* istanbul ignore if */
         if (error) {
           complete(error);
         }

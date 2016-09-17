@@ -6,8 +6,8 @@
 (function(){
 var app = angular.module('devTodo');
 
-app.service('TodoManager',['$q','ApiEndpoint','$rootScope',function($q, ApiEndpoint, $rootScope){
-	var _db;
+app.service('TodoManager',['$q','ApiEndpoint','$rootScope','SecurityManager',function($q, ApiEndpoint, $rootScope, SecurityManager){
+	var _db = SecurityManager.getDb();
 	var _todos;
 
 	function onDatabaseChange(change) {
@@ -38,37 +38,11 @@ app.service('TodoManager',['$q','ApiEndpoint','$rootScope',function($q, ApiEndpo
 	}
 
 	return {
-		initDB: function(){
-			// Creates the database or opens if it already exists
-			console.log('Init db');
-			//_db = new PouchDB('devtodo', {adapter: 'websql'});
-			_db = new PouchDB('todos');
-			var remoteDB = new PouchDB(ApiEndpoint.url);
-			_db.sync(remoteDB, {live: true});
-
-      _db.changes({live: true, since: 'now'}).on('change', function (change) {
-        if (!change.deleted) {
-          $rootScope.$apply(function() {
-            _db.get(change.id, function(err, doc) {
-              $rootScope.$apply(function() {
-                if (err) console.log(err);
-                $rootScope.$broadcast('add', doc);
-              })
-            });
-          })
-        } else {
-          $rootScope.$apply(function() {
-            $rootScope.$broadcast('delete', change.id);
-          });
-        }
-      }).on('error', console.log.bind(console));
-
-		},
 		saveTodo:function(todo){
 			return $q.when(_db.post(todo));
 		},
 		updateTodo:function(todo){
-			return $q.when(_db.put(todo));
+			return $q.when(_db.post(todo));
 		},
 		deleteTodo:function(todo){
 			return $q.when(_db.remove(todo));
@@ -103,5 +77,95 @@ app.service('TodoManager',['$q','ApiEndpoint','$rootScope',function($q, ApiEndpo
 
 }]);
 
+
+  app.service('SecurityManager',['$q','ApiEndpoint','$rootScope',function($q, ApiEndpoint, $rootScope){
+    var _db;
+    var _remoteDB;
+
+    console.log('Init local db');
+    _db = new PouchDB('todos');
+
+
+    return{
+      getDb:function(){
+        return _db;
+      },
+      initRemote: function(){
+        return $q(function(resolve, reject) {
+          console.log('Init remote db: '+ApiEndpoint.url());
+          _remoteDB = new PouchDB(ApiEndpoint.url());
+          _db.changes({live: true, since: 'now'}).on('change', function (change) {
+            if (!change.deleted) {
+              $rootScope.$apply(function() {
+                _db.get(change.id, function(err, doc) {
+                  $rootScope.$apply(function() {
+                    if (err) console.log(err);
+                    $rootScope.$broadcast('add', doc);
+                  })
+                });
+              })
+            } else {
+              $rootScope.$apply(function() {
+                $rootScope.$broadcast('delete', change.id);
+              });
+            }
+          }).on('error', console.log.bind(console));
+
+          _db.sync(_remoteDB, {live: true}).on('complete', function () {
+            $rootScope.$broadcast('syncSuccess');
+            resolve(true)
+          }).on('error', function (err) {
+            console.error('Cannot connect: '+err.name+", "+err.message);
+            $rootScope.$broadcast('syncFailed', err);
+            reject(err);
+          });
+
+
+
+        });
+      },
+      login:function(user,password){
+        return $q(function(resolve, reject) {
+          _remoteDB.login(user, password, function (err, response) {
+            if (err) {
+              $rootScope.$broadcast('loginFailed', err);
+             reject(err);
+            }
+            else{
+              $rootScope.$broadcast('loginSuccess', response);
+              resolve(response);
+            }
+          });
+        });
+      },
+      getLoggedInUser:function(){
+        return $q(function(resolve, reject) {
+          _remoteDB.getSession(function (err, response) {
+            if (err) {
+              reject(err)
+            } else if (!response.userCtx.name) {
+              resolve()
+            }else {
+              resolve(response)
+            }
+          });
+        });
+      },
+      logout:function(){
+        return $q(function(resolve, reject) {
+          _remoteDB.logout(function (err, response) {
+            if (err) {
+              $rootScope.$broadcast('logoutFailed', err);
+              reject(err)
+            }
+            else{
+              $rootScope.$broadcast('loginSuccess', response);
+              resolve(response);
+            }
+          })
+        })
+      }
+    }
+  }]);
 
 })();

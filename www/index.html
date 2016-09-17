@@ -17,8 +17,9 @@
 
     <!-- cordova script (this will be a 404 during development) -->
     <script src="cordova.js"></script>
-	
+
 	<script src="lib/pouchdb/dist/pouchdb.min.js"></script>
+  <script src="lib/pouchdb-authentication/dist/pouchdb.authentication.min.js"></script>
 
     <!-- your app's js -->
     <script src="js/app.js"></script>
@@ -31,11 +32,18 @@
 		<ion-header-bar class="bar-dark">
 			<h1 class="title">Scotch-Todo</h1>
 			<!-- New Task button-->
+      <button class="button button-icon" ng-click="openLoginModal()" ng-hide="loggedInUser">
+        <i class="icon ion-man"></i>
+      </button>
+      <button class="button button-icon" ng-click="logout()" ng-show="loggedInUser">
+        <i class="icon ion-android-exit"></i>
+      </button>
 			<button class="button button-icon" ng-click="openTaskModal()">
 				<i class="icon ion-compose"></i>
 			</button>
 		</ion-header-bar>
       <ion-content>
+
 		<div class="list card" ng-repeat="task in tasks track by $index">
             <div class="item item-divider">
                 <span ng-bind="task.title"></span>
@@ -61,8 +69,8 @@
 
       </ion-content>
     </ion-pane>
-	
-	
+
+
 	 <script id="new-task-modal.html" type="text/ng-template">
         <ion-modal-view>
             <ion-header-bar class="bar-dark">
@@ -97,5 +105,39 @@
             </ion-content>
         </ion-modal-view>
     </script>
+
+
+    <script id="login-modal.html" type="text/ng-template">
+      <ion-modal-view>
+        <ion-header-bar class="bar-dark">
+          <h1 class="title">Login</h1>
+          <button class="button button-icon" ng-click="resetLogin()">
+            <i class="icon ion-android-close"></i>
+          </button>
+        </ion-header-bar>
+        <ion-content>
+        <form  name="loginForm" class="falecomigo" novalidate form-manager >
+          <div class="list list-inset" >
+            <label class="item item-input">
+              <input ng-model="user.username" name="username" type="text" placeholder="Username" required ng-minlength="2" ng-maxlength="70">
+            </label>
+            <label class="item item-input">
+              <input ng-model="user.password" name="password" type="password" placeholder="Password" required ng-maxlength="50">
+            </label>
+          </div>
+          <div>
+            {{loginError.message}}
+          </div>
+          <div class="padding container">
+            <div class="row">
+              <button ng-click="resetLogin()"  class="button button-assertive button-small col col-40"              > Cancel </button>
+              <button ng-click="submitLogin()" class="button button-balanced  button-small col col-40 col-offset-10"> Submit </button>
+            </div>
+          </div>
+        </form>
+        </ion-content>
+      </ion-modal-view>
+    </script>
+
   </body>
 </html>

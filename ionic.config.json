@@ -4,7 +4,7 @@
   "proxies": [
     {
       "path": "/todos",
-      "proxyUrl": "http://localhost:32770/todos"
+      "proxyUrl": "http://10.0.75.1:32770/todos"
     }
   ]
 }

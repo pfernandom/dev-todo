@@ -6,17 +6,28 @@
 (function(){
 var app = angular.module('devTodo');
 
-angular.module('devTodo').controller('TodoCtrl',['$scope','$ionicModal','$ionicPlatform','TodoManager',function($scope, $ionicModal, $ionicPlatform, TodoManager){
+angular.module('devTodo').controller('TodoCtrl',['$scope','$ionicModal','$ionicPlatform','TodoManager','SecurityManager',function($scope, $ionicModal, $ionicPlatform, TodoManager, SecurityManager){
 	 // Initialize the database.
     $ionicPlatform.ready(function() {
-        TodoManager.initDB();
-
         // Get all birthday records from the database.
-        TodoManager.getAllTodos().then(function(todos) {
-            $scope.tasks = todos;
+        SecurityManager.initRemote().then(function(data){
+          console.log(data);
+        }).catch(function(err){
+          console.error(err);
         });
-    });
 
+      TodoManager.getAllTodos().then(function(todos) {
+        console.log(todos);
+        $scope.tasks = todos;
+      });
+
+      SecurityManager.getLoggedInUser().then(function(data){
+        $scope.loggedInUser = data;
+
+      }).catch(function(err){
+        console.error(err);
+      });
+    });
 
 
 	//initialize the tasks scope with empty array
@@ -33,6 +44,44 @@ angular.module('devTodo').controller('TodoCtrl',['$scope','$ionicModal','$ionicP
 		$scope.newTaskModal = modal;
 	});
 
+  $ionicModal.fromTemplateUrl('login-modal.html', {
+    scope: $scope,
+    animation: 'slide-in-up'
+  }).then(function (modal) {
+    $scope.loginModal = modal;
+  });
+
+  $scope.openLoginModal = function(){
+    $scope.loginModal.show();
+  }
+
+  $scope.logout = function(){
+    SecurityManager.logout().then(function(data){
+      console.log(data);
+      delete $scope.loggedInUser;
+    }).catch(function(err){
+      console.error(err);
+    })
+  }
+
+  $scope.resetLogin = function(){
+    $scope.loginModal.hide();
+  }
+
+  $scope.user = {}
+  $scope.submitLogin = function(){
+    console.log($scope.user);
+    SecurityManager.login($scope.user.username,$scope.user.password).then(function(data){
+      $scope.loggedInUser = data;
+      $scope.loginModal.hide();
+    }).catch(function(err){
+      console.error(err);
+      $scope.loginError = err;
+      delete $scope.loggedInUser;
+    })
+
+  }
+
 	$scope.getTasks = function () {
 		//fetches task from local storage
 		return $scope.tasks;
@@ -41,7 +90,6 @@ angular.module('devTodo').controller('TodoCtrl',['$scope','$ionicModal','$ionicP
 		//creates a new task
 		TodoManager.saveTodo($scope.task);
 		$scope.task = {};
-		//close new task modal
 		$scope.newTaskModal.hide();
 	}
 	$scope.removeTask = function (index) {
@@ -52,6 +100,7 @@ angular.module('devTodo').controller('TodoCtrl',['$scope','$ionicModal','$ionicP
 		//updates a task as completed
 		if (index !== -1) {
 		  $scope.tasks[index].completed = !!$scope.tasks[index].completed ;
+      TodoManager.updateTodo( $scope.tasks[index]);
 		}
 	}
 

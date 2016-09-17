@@ -6,6 +6,10 @@ var sass = require('gulp-sass');
 var minifyCss = require('gulp-minify-css');
 var rename = require('gulp-rename');
 var sh = require('shelljs');
+// `npm install --save replace`
+var replace = require('replace');
+var replaceFiles = ['./www/js/app.js'];
+
 
 var paths = {
   sass: ['./scss/**/*.scss']
@@ -49,3 +53,25 @@ gulp.task('git-check', function(done) {
   }
   done();
 });
+
+
+
+gulp.task('add-proxy', function() {
+  return replace({
+    regex: "http://cors.api.com/api",
+    replacement: "http://localhost:8100/todos",
+    paths: replaceFiles,
+    recursive: false,
+    silent: false,
+  });
+})
+
+gulp.task('remove-proxy', function() {
+  return replace({
+    regex: "http://localhost:8100/todos",
+    replacement: "http://cors.api.com/api",
+    paths: replaceFiles,
+    recursive: false,
+    silent: false,
+  });
+})

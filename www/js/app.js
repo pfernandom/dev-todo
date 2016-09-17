@@ -25,5 +25,9 @@ angular.module('devTodo', ['ionic'])
 
 
 .constant('ApiEndpoint', {
-  url: 'http://localhost:8100/todos'
+  server: 'http://10.0.75.1:32770',
+  db:'todos',
+  url: function(){
+    return this.server+"/"+this.db;
+  }
 })
